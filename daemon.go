@@ -55,7 +55,11 @@ func decryptRequest(app *MarathonApp, masterKey *[32]byte, serviceEnvelope strin
 	}
 
 	// Validate that appId, appVersion, taskId corresponds to HTTP request params
-	if request.AppID != app.ID || request.AppVersion != app.Version || request.TaskID != app.TaskID {
+	// Parse the timestamps identifying app versions as Time to prevent issues with missing "0" when comparing as str
+	requestAppVersion, _ := strToTimeRFC3339(request.AppVersion)
+	marathonAppVersion, _ := strToTimeRFC3339(app.Version)
+
+	if request.AppID != app.ID || !requestAppVersion.Equal(marathonAppVersion) || request.TaskID != app.TaskID {
 		return nil, errors.New("Given appid,appversion,taskid doesn't correspond to HTTP request params (bug or hacking attempt?)")
 	}
 

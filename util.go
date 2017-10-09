@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -115,4 +116,12 @@ func httpGet(url string) ([]byte, error) {
 	}
 
 	return httpReadBody(response)
+}
+
+func strToTimeRFC3339(timestr string) (time.Time, error) {
+	rfc3339, err := time.Parse(time.RFC3339, timestr)
+	if err != nil {
+		return rfc3339, fmt.Errorf("Failed to parse time string (%s) due to error (%s)", timestr, err)
+	}
+	return rfc3339, nil
 }

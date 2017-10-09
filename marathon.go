@@ -51,7 +51,10 @@ func verifyRunningTask(appID string, appVersion string, taskID string, body []by
 	// Check running tasks for this app and verify that the given taskId is present
 	isActiveTaskid := false
 	for _, task := range app.App.Tasks {
-		if task.ID == taskID && task.Version == appVersion {
+		// Parse the timestamps identifying task versions as Time to prevent issues with missing "0" when comparing as str
+		requestTaskVersion, _ := strToTimeRFC3339(appVersion)
+		marathonTaskVersion, _ := strToTimeRFC3339(task.Version)
+		if task.ID == taskID && requestTaskVersion.Equal(marathonTaskVersion) {
 			isActiveTaskid = true
 			break
 		}
@@ -68,7 +71,10 @@ func parseApplicationVersion(appID string, appVersion string, taskID string, bod
 	// Parse the JSON response
 	var taskVersion MarathonVersionResponse
 	err := json.Unmarshal(body, &taskVersion)
-	if err != nil || taskVersion.ID != appID || taskVersion.Version != appVersion {
+	// Parse the timestamps identifying app versions as Time to prevent issues with missing "0" when comparing as str
+	receivedAppVersion, _ := strToTimeRFC3339(taskVersion.Version)
+	marathonProvidedTaskVersion, _ := strToTimeRFC3339(appVersion)
+	if err != nil || taskVersion.ID != appID || !receivedAppVersion.Equal(marathonProvidedTaskVersion) {
 		return nil, fmt.Errorf("Failed to parse Marathon JSON response (%s): %s", err, string(body))
 	}
 
@@ -99,7 +105,7 @@ func parseApplicationVersion(appID string, appVersion string, taskID string, bod
 }
 
 func getMarathonApp(marathonURL string, appID string, appVersion string, taskID string) (*MarathonApp, error) {
-	// Validate that given taskId is actually still running (old deploy keys shouldn't be allows to access any secrets)
+	// Validate that given taskId is actually still running (old deploy keys shouldn't be allowed to access any secrets)
 	{
 		// Fetch the list of running tasks for this app
 		url := fmt.Sprintf("%s/v2/apps/%s?embed=apps.tasks", marathonURL,

@@ -70,3 +70,24 @@ func TestStripWhitespace(t *testing.T) {
 	assert.Equal(t, "abc", stripWhitespace(" a b\n c "))
 	assert.Equal(t, "abc", stripWhitespace(" a \r\nb\n c \n"))
 }
+
+func TestStrToTimeRFC3339(t *testing.T) {
+	// Verify there are no errors
+	oneRfc3339, err := strToTimeRFC3339("2017-10-09T11:25:50.03Z")
+	assert.Nil(t, err)
+
+	sameRfc3339, err := strToTimeRFC3339("2017-10-09T11:25:50.030Z")
+	assert.Nil(t, err)
+
+	otherRfc3339, err := strToTimeRFC3339("2017-10-09T11:26:50.03Z")
+	assert.Nil(t, err)
+
+	// Verify there is an error
+	badRfc3339, err := strToTimeRFC3339("bad string")
+	assert.NotNil(t, err)
+
+	// Verify comparison using time.Equal method
+	assert.True(t, oneRfc3339.Equal(sameRfc3339))
+	assert.False(t, otherRfc3339.Equal(sameRfc3339))
+	assert.False(t, badRfc3339.Equal(oneRfc3339))
+}
