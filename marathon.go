@@ -67,7 +67,7 @@ func verifyRunningTask(appID string, appVersion string, taskID string, body []by
 	return true, nil
 }
 
-func parseApplicationVersion(appID string, appVersion string, taskID string, body []byte) (*MarathonApp, error) {
+func parseApplicationVersion(appID string, appVersion string, taskID string, body []byte) (*AppOrTask, error) {
 	// Parse the JSON response
 	var taskVersion MarathonVersionResponse
 	err := json.Unmarshal(body, &taskVersion)
@@ -99,12 +99,12 @@ func parseApplicationVersion(appID string, appVersion string, taskID string, bod
 		}
 	}
 
-	return &MarathonApp{ID: taskVersion.ID, Version: taskVersion.Version,
+	return &AppOrTask{ID: taskVersion.ID, Version: taskVersion.Version,
 		TaskID: taskID, DeployKey: deployKey, ServiceKey: serviceKey,
 		Env: taskVersion.Env}, nil
 }
 
-func getMarathonApp(marathonURL string, appID string, appVersion string, taskID string) (*MarathonApp, error) {
+func getMarathonApp(marathonURL string, appID string, appVersion string, taskID string) (*AppOrTask, error) {
 	// Validate that given taskId is actually still running (old deploy keys shouldn't be allowed to access any secrets)
 	{
 		// Fetch the list of running tasks for this app

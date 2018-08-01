@@ -56,7 +56,7 @@ func TestKms(t *testing.T) {
 	envelope, err := encryption.Encrypt([]byte("secret"))
 	assert.Nil(t, err)
 
-	plaintext, err := decryption.Decrypt(envelope)
+	plaintext, err := decryption.Decrypt(envelope, "")
 	assert.Nil(t, err)
 	assert.Equal(t, "secret", string(plaintext))
 }
@@ -69,19 +69,19 @@ func TestCompositeDecryptionStrategy(t *testing.T) {
 		pemRead("./resources/test/keys/master-private-key.pem")))
 
 	{
-		plaintext, err := composite.Decrypt("ENC[KMS,RP+BAwEBCmttc1BheWxvYWQB/4IAAQMBEEVuY3J5cHRlZERhdGFLZXkBCgABBU5vbmNlAf+EAAEHTWVzc2FnZQEKAAAAGf+DAQEBCVsyNF11aW50OAH/hAABBgEwAABw/4IBLFExUHVXdEIxRTdGMXNMcHZmQkdqTCtadUgrZlNDT3ZNRHFUeVJRRTRHVGc9ARgr/502fv/vQP+S/5H/k//gOf/gWDNh/53/3in/uf/L/5r/mTxbARYoewY+qb+skiPKwGUnT/2GADtui80vAA==]")
+		plaintext, err := composite.Decrypt("ENC[KMS,RP+BAwEBCmttc1BheWxvYWQB/4IAAQMBEEVuY3J5cHRlZERhdGFLZXkBCgABBU5vbmNlAf+EAAEHTWVzc2FnZQEKAAAAGf+DAQEBCVsyNF11aW50OAH/hAABBgEwAABw/4IBLFExUHVXdEIxRTdGMXNMcHZmQkdqTCtadUgrZlNDT3ZNRHFUeVJRRTRHVGc9ARgr/502fv/vQP+S/5H/k//gOf/gWDNh/53/3in/uf/L/5r/mTxbARYoewY+qb+skiPKwGUnT/2GADtui80vAA==]", "")
 		assert.Nil(t, err)
 		assert.Equal(t, "secret", string(plaintext))
 	}
 
 	{
-		plaintext, err := composite.Decrypt("ENC[NACL,fB7RSmpONiUGzaHtd8URiTSKqfBhor6BsJLSQErHH9NSgLTnxNLF60YS8ZT2IQ==]")
+		plaintext, err := composite.Decrypt("ENC[NACL,fB7RSmpONiUGzaHtd8URiTSKqfBhor6BsJLSQErHH9NSgLTnxNLF60YS8ZT2IQ==]", "")
 		assert.Nil(t, err)
 		assert.Equal(t, "secret", string(plaintext))
 	}
 
 	{
-		plaintext, err := composite.Decrypt("ENC[ACL,fB7RSmpONiUGzaHtd8URiTSKqfBhor6BsJLSQErHH9NSgLTnxNLF60YS8ZT2IQ==]")
+		plaintext, err := composite.Decrypt("ENC[ACL,fB7RSmpONiUGzaHtd8URiTSKqfBhor6BsJLSQErHH9NSgLTnxNLF60YS8ZT2IQ==]", "")
 		assert.Nil(t, plaintext)
 		assert.NotNil(t, err)
 		assert.Equal(t, "Not configured for decrypting ENC[,..] values", err.Error())
@@ -91,7 +91,7 @@ func TestCompositeDecryptionStrategy(t *testing.T) {
 func TestUnsupportedDecryptionStrategy(t *testing.T) {
 	composite := newCompositeDecryptionStrategy()
 
-	plaintext, err := composite.Decrypt("ENC[NACL,fB7RSmpONiUGzaHtd8URiTSKqfBhor6BsJLSQErHH9NSgLTnxNLF60YS8ZT2IQ==]")
+	plaintext, err := composite.Decrypt("ENC[NACL,fB7RSmpONiUGzaHtd8URiTSKqfBhor6BsJLSQErHH9NSgLTnxNLF60YS8ZT2IQ==]", "")
 	assert.Nil(t, plaintext)
 	assert.NotNil(t, err)
 	assert.Equal(t, "Not configured for decrypting ENC[NACL,..] values", err.Error())

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -102,6 +103,16 @@ func httpReadBody(response *http.Response) ([]byte, error) {
 
 func httpPostForm(url string, values url.Values) ([]byte, error) {
 	response, err := http.PostForm(url, values)
+	if err != nil {
+		return nil, err
+	}
+
+	return httpReadBody(response)
+}
+
+func httpPostJSON(url string, json []byte) ([]byte, error) {
+
+	response, err := http.Post(url, "application/json", bytes.NewBuffer(json))
 	if err != nil {
 		return nil, err
 	}

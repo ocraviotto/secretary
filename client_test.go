@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -15,7 +16,7 @@ func TestKeyDecryptionStrategy(t *testing.T) {
 		pemRead("./resources/test/keys/config-public-key.pem"),
 		pemRead("./resources/test/keys/master-private-key.pem"))
 
-	plaintext, err := crypto.Decrypt("ENC[NACL,fB7RSmpONiUGzaHtd8URiTSKqfBhor6BsJLSQErHH9NSgLTnxNLF60YS8ZT2IQ==]")
+	plaintext, err := crypto.Decrypt("ENC[NACL,fB7RSmpONiUGzaHtd8URiTSKqfBhor6BsJLSQErHH9NSgLTnxNLF60YS8ZT2IQ==]", "")
 	assert.Nil(t, err)
 	assert.Equal(t, "secret", string(plaintext))
 }
@@ -32,7 +33,7 @@ func TestKeyEncryptionStrategy(t *testing.T) {
 	envelope, err := encryption.Encrypt([]byte("secret"))
 	assert.Nil(t, err)
 
-	plaintext, err := decryption.Decrypt(envelope)
+	plaintext, err := decryption.Decrypt(envelope, "")
 	assert.Nil(t, err)
 	assert.Equal(t, "secret", string(plaintext))
 }
@@ -90,8 +91,35 @@ func TestDaemonDecryptionStrategy(t *testing.T) {
 	}))
 	defer marathon.Close()
 
+	// Mesos single response when getting tasks
+	mesosResponse, err := ioutil.ReadFile("./resources/test/mesos-get-tasks.json")
+	assert.Nil(t, err)
+
+	// Start in-test HTTP server that emulates Mesos operator API for GET_TASKS
+	mesos := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.URL.EscapedPath() == "/api/v1" && r.Method == "POST":
+			decoder := json.NewDecoder(r.Body)
+			var t apiType
+			decodeErr := decoder.Decode(&t)
+			if decodeErr != nil {
+				http.Error(w, fmt.Sprintf("Could not decode request %s", r.Body), http.StatusBadRequest)
+				break
+			}
+			if t.Type != "GET_TASKS" {
+				http.Error(w, fmt.Sprintf("Type not supported %s", t.Type), http.StatusBadRequest)
+				break
+			}
+			fmt.Fprintln(w, string(mesosResponse))
+		default:
+			http.Error(w, fmt.Sprintf("Bad URL %s", r.URL.Path), http.StatusNotFound)
+		}
+	}))
+	defer mesos.Close()
+
 	// Start secretary daemon
-	handler := decryptEndpointHandler(marathon.URL,
+	handler := decryptEndpointHandler(marathon.URL, mesos.URL,
 		pemRead("./resources/test/keys/master-private-key.pem"),
 		newTestDecryptionStrategy(
 			"./resources/test/keys/config-public-key.pem",
@@ -117,7 +145,7 @@ func TestDaemonDecryptionStrategy(t *testing.T) {
 	encryptedSecret := "ENC[NACL,jpDAHM6WZe/1C93FLHd2M916U9AQwjT3VdvzQ7JHTHc57dLXsGE+oI8wDE2Fiw==]"
 	kmsSecret := "ENC[KMS,RP+BAwEBCmttc1BheWxvYWQB/4IAAQMBEEVuY3J5cHRlZERhdGFLZXkBCgABBU5vbmNlAf+EAAEHTWVzc2FnZQEKAAAAGf+DAQEBCVsyNF11aW50OAH/hAABBgEwAABw/4IBLFExUHVXdEIxRTdGMXNMcHZmQkdqTCtadUgrZlNDT3ZNRHFUeVJRRTRHVGc9ARgr/502fv/vQP+S/5H/k//gOf/gWDNh/53/3in/uf/L/5r/mTxbARYoewY+qb+skiPKwGUnT/2GADtui80vAA==]"
 
-	// Test decryption with both deploy and service keys
+	// Test Marathon decryption with both deploy and service keys
 	{
 		crypto := newDaemonDecryptionStrategy(daemon.URL,
 			appID, appVersion, taskID,
@@ -125,16 +153,16 @@ func TestDaemonDecryptionStrategy(t *testing.T) {
 			deployPrivateKey,
 			pemRead("./resources/test/keys/myservice-private-key.pem"))
 
-		plaintext, err := crypto.Decrypt(encryptedSecret)
+		plaintext, err := crypto.Decrypt(encryptedSecret, "")
 		assert.Nil(t, err)
 		assert.Equal(t, "secret", string(plaintext))
 
-		plaintext, err = crypto.Decrypt(kmsSecret)
+		plaintext, err = crypto.Decrypt(kmsSecret, "")
 		assert.Nil(t, err)
 		assert.Equal(t, "secret", string(plaintext))
 	}
 
-	// Test decryption of a secret that is in a substring in the app config
+	// Test Marathon decryption of a secret that is in a substring in the app config
 	{
 		crypto := newDaemonDecryptionStrategy(daemon.URL,
 			"/demo/webapp3", appVersion, taskID,
@@ -142,13 +170,13 @@ func TestDaemonDecryptionStrategy(t *testing.T) {
 			deployPrivateKey,
 			pemRead("./resources/test/keys/myservice-private-key.pem"))
 
-		plaintext, err := crypto.Decrypt(encryptedSecret)
+		plaintext, err := crypto.Decrypt(encryptedSecret, "")
 		fmt.Println(err)
 		assert.Nil(t, err)
 		assert.Equal(t, "secret", string(plaintext))
 	}
 
-	// Test decryption of a multi-line block
+	// Test Marathon decryption of a multi-line block
 	{
 		encryptedKey := "ENC[NACL,egFSuFDkZxsmv9w7bWyZyxCBQQeykctG2H6UTiK7EHRdQI3E3NsZBP84Gqy8c5kh8BYErki6F0eqKAxd3u/QcOuMD17YgqTGiE/PMlO75yCuBzCnZNW7Y4b5Ww03v6uo1Fr/ew==]"
 
@@ -158,37 +186,39 @@ func TestDaemonDecryptionStrategy(t *testing.T) {
 			deployPrivateKey,
 			pemRead("./resources/test/keys/myservice-private-key.pem"))
 
-		plaintext, err := crypto.Decrypt(encryptedKey)
+		plaintext, err := crypto.Decrypt(encryptedKey, "")
 		assert.Nil(t, err)
 		assert.Equal(t, "123456789012345678901234567890123456789012345678901234567890", string(plaintext))
 	}
 
-	// Test without a service key
+	// Test Marathon without a service key
 	{
 		crypto := newDaemonDecryptionStrategy(daemon.URL,
 			"/demo/webapp2", appVersion, taskID,
 			pemRead("./resources/test/keys/master-public-key.pem"),
 			deployPrivateKey, nil)
 
-		plaintext, err := crypto.Decrypt(encryptedSecret)
+		plaintext, err := crypto.Decrypt(encryptedSecret, "")
 		assert.Nil(t, err)
 		assert.Equal(t, "secret", string(plaintext))
 	}
 
-	// Test with a secret that's correct but not part of config
+	// Test Marathon with a secret that's correct but not part of config
 	{
 		crypto := newDaemonDecryptionStrategy(daemon.URL,
 			"/demo/webapp2", appVersion, taskID,
 			pemRead("./resources/test/keys/master-public-key.pem"),
 			deployPrivateKey, nil)
 
-		plaintext, err := crypto.Decrypt("ENC[NACL,Gk0NEy/PBF/949bR/lht1nsI09wYKkY0JOIjW9NFZFG6NTasF00OSWDRA1jA9eRjSR2/0xVCMEKoTou1PGcHSOmvFJGa71GScsI04nan/ZL2c9oeAt//mavWJlOuRokq1grdc3RVk0pwpFnzdLd2gaQW]")
+		plaintext, err := crypto.Decrypt(
+			"ENC[NACL,Gk0NEy/PBF/949bR/lht1nsI09wYKkY0JOIjW9NFZFG6NTasF00OSWDRA1jA9eRjSR2/0xVCMEKoTou1PGcHSOmvFJGa71GScsI04nan/ZL2c9oeAt//mavWJlOuRokq1grdc3RVk0pwpFnzdLd2gaQW]",
+			"")
 		assert.NotNil(t, err)
 		assert.Nil(t, plaintext)
 		assert.Equal(t, "Failed to decrypt using daemon (HTTP 401 Error: Given secret isn't part of app config (bug or hacking attempt?))", err.Error())
 	}
 
-	// Test decryption with bad deploy key
+	// Test Marathon decryption with bad deploy key
 	{
 		crypto := newDaemonDecryptionStrategy(daemon.URL,
 			appID, appVersion, taskID,
@@ -196,13 +226,13 @@ func TestDaemonDecryptionStrategy(t *testing.T) {
 			pemRead("./resources/test/keys/bad-private-key.pem"),
 			pemRead("./resources/test/keys/myservice-private-key.pem"))
 
-		plaintext, err := crypto.Decrypt(encryptedSecret)
+		plaintext, err := crypto.Decrypt(encryptedSecret, "")
 		assert.NotNil(t, err)
 		assert.Nil(t, plaintext)
 		assert.Equal(t, "Failed to decrypt using daemon (HTTP 400 Error: Failed to authenticate/decrypt request using deploy and master key (incorrect master key or hacking attempt? (Failed to decrypt (incorrect keys?))))", err.Error())
 	}
 
-	// Test decryption with bad service key
+	// Test Marathon decryption with bad service key
 	{
 		crypto := newDaemonDecryptionStrategy(daemon.URL,
 			appID, appVersion, taskID,
@@ -210,26 +240,26 @@ func TestDaemonDecryptionStrategy(t *testing.T) {
 			deployPrivateKey,
 			pemRead("./resources/test/keys/bad-private-key.pem"))
 
-		plaintext, err := crypto.Decrypt(encryptedSecret)
+		plaintext, err := crypto.Decrypt(encryptedSecret, "")
 		assert.NotNil(t, err)
 		assert.Nil(t, plaintext)
 		assert.Equal(t, "Failed to decrypt using daemon (HTTP 400 Error: Failed to authenticate/decrypt request using service and master key (incorrect master key or hacking attempt? (Failed to decrypt (incorrect keys?))))", err.Error())
 	}
 
-	// Test with a bad master key
+	// Test Marathon with a bad master key
 	{
 		crypto := newDaemonDecryptionStrategy(daemon.URL,
 			"/demo/webapp", appVersion, taskID,
 			pemRead("./resources/test/keys/bad-public-key.pem"),
 			deployPrivateKey, nil)
 
-		plaintext, err := crypto.Decrypt(encryptedSecret)
+		plaintext, err := crypto.Decrypt(encryptedSecret, "")
 		assert.NotNil(t, err)
 		assert.Nil(t, plaintext)
 		assert.Equal(t, "Failed to decrypt using daemon (HTTP 400 Error: Failed to authenticate/decrypt request using deploy and master key (incorrect master key or hacking attempt? (Failed to decrypt (incorrect keys?))))", err.Error())
 	}
 
-	// Test with a bad service key
+	// Test Marathon with a bad service key
 	{
 		crypto := newDaemonDecryptionStrategy(daemon.URL,
 			appID, badAppVersion, badTaskID,
@@ -237,13 +267,13 @@ func TestDaemonDecryptionStrategy(t *testing.T) {
 			deployPrivateKey,
 			pemRead("./resources/test/keys/myservice-private-key.pem"))
 
-		plaintext, err := crypto.Decrypt(encryptedSecret)
+		plaintext, err := crypto.Decrypt(encryptedSecret, "")
 		assert.NotNil(t, err)
 		assert.Nil(t, plaintext)
 		assert.Equal(t, "Failed to decrypt using daemon (HTTP 400 Error: Failed to authenticate/decrypt request using service and master key (incorrect master key or hacking attempt? (Failed to decrypt (incorrect keys?))))", err.Error())
 	}
 
-	// Test with a appVersion and taskId mismatch
+	// Test Marathon with an appVersion and taskId mismatch
 	{
 		crypto := newDaemonDecryptionStrategy(daemon.URL,
 			appID, appVersion, badTaskID,
@@ -251,14 +281,14 @@ func TestDaemonDecryptionStrategy(t *testing.T) {
 			deployPrivateKey,
 			pemRead("./resources/test/keys/myservice-private-key.pem"))
 
-		plaintext, err := crypto.Decrypt(encryptedSecret)
+		plaintext, err := crypto.Decrypt(encryptedSecret, "")
 		assert.NotNil(t, err)
 		assert.Nil(t, plaintext)
 		assert.Equal(t, "Failed to decrypt using daemon (HTTP 500 Error: Given taskId is not running (bug or hacking attempt?))", err.Error())
 	}
 
-	// Test with a bad config public key
-	handler = decryptEndpointHandler(marathon.URL,
+	// Test Marathon with a bad config public key
+	handler = decryptEndpointHandler(marathon.URL, mesos.URL,
 		pemRead("./resources/test/keys/master-private-key.pem"),
 		newTestDecryptionStrategy(
 			"./resources/test/keys/bad-public-key.pem",
@@ -271,14 +301,14 @@ func TestDaemonDecryptionStrategy(t *testing.T) {
 			deployPrivateKey,
 			pemRead("./resources/test/keys/myservice-private-key.pem"))
 
-		plaintext, err := crypto.Decrypt(encryptedSecret)
+		plaintext, err := crypto.Decrypt(encryptedSecret, "")
 		assert.NotNil(t, err)
 		assert.Nil(t, plaintext)
 		assert.Equal(t, "Failed to decrypt using daemon (HTTP 400 Error: Failed to decrypt plaintext secret, incorrect config or master key? (Failed to decrypt (incorrect keys?)))", err.Error())
 	}
 
-	// Test with a bad master private key
-	handler = decryptEndpointHandler(marathon.URL,
+	// Test Marathon with a bad master private key
+	handler = decryptEndpointHandler(marathon.URL, mesos.URL,
 		pemRead("./resources/test/keys/bad-private-key.pem"),
 		newTestDecryptionStrategy(
 			"./resources/test/keys/config-public-key.pem",
@@ -291,14 +321,14 @@ func TestDaemonDecryptionStrategy(t *testing.T) {
 			deployPrivateKey,
 			pemRead("./resources/test/keys/myservice-private-key.pem"))
 
-		plaintext, err := crypto.Decrypt(encryptedSecret)
+		plaintext, err := crypto.Decrypt(encryptedSecret, "")
 		assert.NotNil(t, err)
 		assert.Nil(t, plaintext)
 		assert.Equal(t, "Failed to decrypt using daemon (HTTP 400 Error: Failed to authenticate/decrypt request using deploy and master key (incorrect master key or hacking attempt? (Failed to decrypt (incorrect keys?))))", err.Error())
 	}
 
-	// Test with a bad master private key
-	handler = decryptEndpointHandler(marathon.URL,
+	// Test Marathon with a bad master private key
+	handler = decryptEndpointHandler(marathon.URL, mesos.URL,
 		pemRead("./resources/test/keys/master-private-key.pem"),
 		newTestDecryptionStrategy(
 			"./resources/test/keys/config-public-key.pem",
@@ -311,9 +341,97 @@ func TestDaemonDecryptionStrategy(t *testing.T) {
 			deployPrivateKey,
 			pemRead("./resources/test/keys/myservice-private-key.pem"))
 
-		plaintext, err := crypto.Decrypt(encryptedSecret)
+		plaintext, err := crypto.Decrypt(encryptedSecret, "")
 		assert.NotNil(t, err)
 		assert.Nil(t, plaintext)
 		assert.Equal(t, "Failed to decrypt using daemon (HTTP 400 Error: Failed to decrypt plaintext secret, incorrect config or master key? (Failed to decrypt (incorrect keys?)))", err.Error())
 	}
+
+	// Mesos tests
+	appID, appVersion = "", ""
+	taskID = "test-job_20180725075828m0Ezl.83c2ad68-8fe0-11e8-88f5-b2fbd5835ad5"
+	encryptedSecretEnvVarName := "NACL_SECRET"
+	kmsSecretEnvVarName := "KMS_SECRET"
+	notAllowedEnvVarName := "NOT_ALLOWED_SECRET"
+	taskNoServiceKeyID := "test-no-service-key-job.83c2ad68-8fe0-11e8-88f5-b2fbd5835ad5"
+	taskMissingAllowedSecretsVarID := "test-allowed-vars-missing-job.83c2ad68-8fe0-11e8-88f5-b2fbd5835ad5"
+	taskNonExistingID := "test-non-existing-job.83c2ad68-8fe0-11e8-88f5-b2fbd5835ad5"
+
+	// Reset the handler to good values
+	handler = decryptEndpointHandler(marathon.URL, mesos.URL,
+		pemRead("./resources/test/keys/master-private-key.pem"),
+		newTestDecryptionStrategy(
+			"./resources/test/keys/config-public-key.pem",
+			"./resources/test/keys/master-private-key.pem"))
+
+	// Test Mesos decryption with both deploy and service keys
+	{
+		crypto := newDaemonDecryptionStrategy(daemon.URL,
+			appID, appVersion, taskID,
+			pemRead("./resources/test/keys/master-public-key.pem"),
+			deployPrivateKey,
+			pemRead("./resources/test/keys/myservice-private-key.pem"))
+
+		plaintext, err := crypto.Decrypt(encryptedSecret, encryptedSecretEnvVarName)
+		assert.Nil(t, err)
+		assert.Equal(t, "secret", string(plaintext))
+
+		plaintext, err = crypto.Decrypt(kmsSecret, kmsSecretEnvVarName)
+		assert.Nil(t, err)
+		assert.Equal(t, "secret", string(plaintext))
+	}
+
+	// Test Mesos without a service key
+	{
+		crypto := newDaemonDecryptionStrategy(daemon.URL,
+			appID, appVersion, taskNoServiceKeyID,
+			pemRead("./resources/test/keys/master-public-key.pem"),
+			deployPrivateKey, nil)
+
+		plaintext, err := crypto.Decrypt(encryptedSecret, encryptedSecretEnvVarName)
+		assert.Nil(t, err)
+		assert.Equal(t, "secret", string(plaintext))
+	}
+
+	// Test Mesos with a not allowed var name decryption
+	{
+		crypto := newDaemonDecryptionStrategy(daemon.URL,
+			appID, appVersion, taskID,
+			pemRead("./resources/test/keys/master-public-key.pem"),
+			deployPrivateKey,
+			pemRead("./resources/test/keys/myservice-private-key.pem"))
+
+		plaintext, err := crypto.Decrypt(encryptedSecret, notAllowedEnvVarName)
+		assert.NotNil(t, err)
+		assert.Nil(t, plaintext)
+		assert.Equal(t, "Failed to decrypt using daemon (HTTP 401 Error: Given secret is not in an env var allowed in ALLOWED_SECRETS_VARS (bug or hacking attempt?))", err.Error())
+	}
+
+	// Test Mesos without ALLOWED_SECRETS_VARS
+	{
+		crypto := newDaemonDecryptionStrategy(daemon.URL,
+			appID, appVersion, taskMissingAllowedSecretsVarID,
+			pemRead("./resources/test/keys/master-public-key.pem"),
+			deployPrivateKey,
+			pemRead("./resources/test/keys/myservice-private-key.pem"))
+
+		plaintext, err := crypto.Decrypt(encryptedSecret, encryptedSecretEnvVarName)
+		assert.NotNil(t, err)
+		assert.Nil(t, plaintext)
+		assert.Equal(t, "Failed to decrypt using daemon (HTTP 401 Error: Given mesos task secret requires the label ALLOWED_SECRETS_VARS set (bug or hacking attempt?))", err.Error())
+	}
+
+	// Test Mesos with not running (not existing) task
+	{
+		crypto := newDaemonDecryptionStrategy(daemon.URL,
+			appID, appVersion, taskNonExistingID,
+			pemRead("./resources/test/keys/master-public-key.pem"),
+			deployPrivateKey,
+			pemRead("./resources/test/keys/myservice-private-key.pem"))
+
+		plaintext, err := crypto.Decrypt(encryptedSecret, encryptedSecretEnvVarName)
+		assert.NotNil(t, err)
+		assert.Nil(t, plaintext)
+	}
+
 }
