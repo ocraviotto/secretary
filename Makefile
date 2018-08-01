@@ -32,4 +32,7 @@ clean:
 docker:
 	docker build -t comptel/secretary:${VERSION} .
 
+docker-push:
+	docker push comptel/secretary:${VERSION}
+
 .PHONY: tools deps fmt build test lint clean
