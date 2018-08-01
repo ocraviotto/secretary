@@ -164,7 +164,7 @@ func main() {
 
 		cmdDaemon.Flags().StringVarP(&marathonURL, "marathon-url", "",
 			defaults(os.Getenv("MARATHON_URL"), "http://marathon.mesos:8080"), "URL of Marathon")
-		cmdDaemon.Flags().StringVarP(&marathonURL, "mesos-leader-url", "",
+		cmdDaemon.Flags().StringVarP(&mesosLeaderURL, "mesos-leader-url", "",
 			defaults(os.Getenv("MESOS_LEADER_URL"), "http://leader.mesos:5050"), "URL of Mesos Leader")
 		cmdDaemon.Flags().StringVarP(&configKeyFile, "config-key", "", "", "Config public key file")
 		cmdDaemon.Flags().StringVarP(&masterKeyFile, "master-key", "", "", "Master private key file")
