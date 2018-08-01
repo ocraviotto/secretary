@@ -40,7 +40,7 @@ func decryptStream(input io.Reader, output io.Writer, crypto DecryptionStrategy)
 	envelopes := extractEnvelopes(string(payload))
 	if len(envelopes) > 0 {
 		for _, envelope := range envelopes {
-			plaintext, err := crypto.Decrypt(stripWhitespace(envelope))
+			plaintext, err := crypto.Decrypt(stripWhitespace(envelope), "")
 			check(err)
 
 			result = strings.Replace(result, envelope, string(plaintext), 1)
@@ -69,7 +69,7 @@ func decryptEnvironment(input []string, output io.Writer, crypto DecryptionStrat
 			}
 
 			for _, envelope := range envelopes {
-				plaintext, suberr := crypto.Decrypt(stripWhitespace(envelope))
+				plaintext, suberr := crypto.Decrypt(stripWhitespace(envelope), key)
 				if suberr != nil {
 					ok = false
 					err = suberr

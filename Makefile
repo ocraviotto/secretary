@@ -30,6 +30,9 @@ clean:
 	rm -f ./secretary
 
 docker:
-	docker build -t meltwater/secretary:latest .
+	docker build -t comptel/secretary:${VERSION} .
+
+docker-push:
+	docker push comptel/secretary:${VERSION}
 
 .PHONY: tools deps fmt build test lint clean

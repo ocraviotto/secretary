@@ -1,7 +1,10 @@
 # Secretary
-[![Travis CI](https://img.shields.io/travis/meltwater/secretary/master.svg)](https://travis-ci.org/meltwater/secretary)
-[![Coverage Status](http://codecov.io/github/meltwater/secretary/coverage.svg?branch=master)](http://codecov.io/github/meltwater/secretary?branch=master)
-[![Go Report Card](https://goreportcard.com/badge/github.com/meltwater/secretary)](https://goreportcard.com/report/github.com/meltwater/secretary)
+[![Travis CI](https://img.shields.io/travis/ocraviotto/secretary/master.svg)](https://travis-ci.org/ocraviotto/secretary)
+[![Coverage Status](http://codecov.io/github/ocraviotto/secretary/coverage.svg?branch=master)](http://codecov.io/github/ocraviotto/secretary?branch=master)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ocraviotto/secretary)](https://goreportcard.com/report/github.com/ocraviotto/secretary)
+
+## NOTE: 
+This is a Fork of [Meltwater's Secretary](https://github.com/meltwater/secretary/) extended to support mesos tasks. It is WIP and eventually I will try to have it merged upstream (not sure when, if at all, there is an [old PR](https://github.com/meltwater/secretary/pull/22) still pending from early October last year and I need to get in touch with the authors as there has been little activity over the past half a year). On the meantime, we'll develop and will publish to the Docker Hub public repo [comptel/secretary](https://hub.docker.com/r/comptel/secretary/)
 
 [Secretary](https://en.wikipedia.org/wiki/Secretary#Etymology) helps solve the problem of
 secrets distribution and authorization in highly dynamic container and VM environments.
@@ -23,7 +26,8 @@ local NaCL keys or by calling the AWS Key Management Service.
 In Mesos clusters it may not be desirable to have all slave nodes hold master keys or access KMS
 directly. A container would instead call `secretary daemon` which authenticates its signature and
 performs the decryption in a central place. The `secretary daemon` queries [Marathon](https://mesosphere.github.io/marathon/)
-to retrieve a containers public keys and determine what secrets it may access.
+or the [Mesos Opoerator API](http://mesos.apache.org/documentation/latest/operator-http-api/)
+to retrieve a containers/task public keys and determine what secrets it may access.
 
 Encryption is done at configuration time through public keys or by calling KMS. This
 enables delegation of secrets management to non-admin users and help keep configuration, secrets
@@ -48,11 +52,10 @@ service instances.
 
 - *deploy* key pair is used to control what service can access what secrets, and
   to authenticate services at runtime. It is generated automatically at deployment
-  time for each service, and is part of the Marathon app config. When using
-  [Lighter](https://github.com/meltwater/lighter) it will generate this key pair
-  automatically.
+  time for each service, and is part of the Marathon app config (Env) or the Mesos
+  task json representation (as a Label).
 
-  Access to the Marathon REST API should be restricted to avoid reading out the
+  Access to the Marathon/Mesos APIs should be restricted to avoid reading out the
   *deploy* private keys, and not to mention prevent anyone from starting containers
   with `--privileged --volume=/:/host-root`.
 
@@ -229,7 +232,7 @@ environment variables, before starting the actual service.
 ```
 # Install secretary
 ENV SECRETARY_VERSION x.y.z
-RUN curl -fsSLo /usr/bin/secretary "https://github.com/meltwater/secretary/releases/download/${SECRETARY_VERSION}/secretary-`uname -s`-`uname -m`" && \
+RUN curl -fsSLo /usr/bin/secretary "https://github.com/ocraviotto/secretary/releases/download/${SECRETARY_VERSION}/secretary-`uname -s`-`uname -m`" && \
     chmod +x /usr/bin/secretary
 ```
 
@@ -271,7 +274,7 @@ The complete decryption sequence could be described as
 
 ## Installation
 Place a `secretary` script in the root of your configuration repo. Replace the SECRETARY_VERSION with
-a version from the [releases page](https://github.com/meltwater/secretary/releases).
+a version from the [releases page](https://github.com/ocraviotto/secretary/releases).
 
 ```
 #!/bin/bash
@@ -284,7 +287,7 @@ SECRETARY="$BASEDIR/target/secretary-`uname -s`-`uname -m`-${SECRETARY_VERSION}"
 
 if [ ! -x "$SECRETARY" ]; then
     mkdir -p $(dirname "$SECRETARY")
-    curl -sSfLo "$SECRETARY" https://github.com/meltwater/secretary/releases/download/${SECRETARY_VERSION}/secretary-`uname -s`-`uname -m`
+    curl -sSfLo "$SECRETARY" https://github.com/ocraviotto/secretary/releases/download/${SECRETARY_VERSION}/secretary-`uname -s`-`uname -m`
     chmod +x "$SECRETARY"
 fi
 
@@ -411,12 +414,12 @@ specific KMS keys.
 When using [CoreOS cloud-config](https://coreos.com/os/docs/latest/cloud-config.html) and passing secrets
 in the user-data section.
 
-In the examples replace the SECRETARY_VERSION with a version from the [releases page](https://github.com/meltwater/secretary/releases).
+In the examples replace the SECRETARY_VERSION with a version from the [releases page](https://github.com/ocraviotto/secretary/releases).
 You also need to replace the `e59c5534e4e6fb3c2ad0d3c075d9e2fa664889b9` sha1sum with one that is calculated
 from the exact version you intend to use. This can be done like
 
 ```
-curl -sSL https://github.com/meltwater/secretary/releases/download/${SECRETARY_VERSION}/secretary-Linux-x86_64 | sha1sum -
+curl -sSL https://github.com/ocraviotto/secretary/releases/download/${SECRETARY_VERSION}/secretary-Linux-x86_64 | sha1sum -
 ```
 
 #### Embedded Secretary binary
@@ -503,7 +506,7 @@ coreos:
       # Download and verify signature of secretary binary
       ExecStartPre=/bin/sh -c '\
         if [ ! -f /tmp/secretary ]; then \
-          curl -sSLo /tmp/secretary https://github.com/meltwater/secretary/releases/download/${SECRETARY_VERSION}/secretary-Linux-x86_64 && \
+          curl -sSLo /tmp/secretary https://github.com/ocraviotto/secretary/releases/download/${SECRETARY_VERSION}/secretary-Linux-x86_64 && \
           chmod +x /tmp/secretary; \
         fi'
       ExecStartPre=/bin/sh -c 'echo e59c5534e4e6fb3c2ad0d3c075d9e2fa664889b9 /tmp/secretary | sha1sum -c -'

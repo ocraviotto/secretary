@@ -177,7 +177,7 @@ type KmsDecryptionStrategy struct {
 }
 
 // Decrypt a transport envelope
-func (k *KmsDecryptionStrategy) Decrypt(envelope string) ([]byte, error) {
+func (k *KmsDecryptionStrategy) Decrypt(envelope, optionalName string) ([]byte, error) {
 	// Extract payload
 	encrypted, err := decode(envelope[8 : len(envelope)-1])
 	if err != nil {

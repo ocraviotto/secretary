@@ -13,7 +13,7 @@ type EncryptionStrategy interface {
 
 // DecryptionStrategy is a generic decryption mechanism
 type DecryptionStrategy interface {
-	Decrypt(envelope string) ([]byte, error)
+	Decrypt(envelope, optionalName string) ([]byte, error)
 }
 
 // CompositeDecryptionStrategy multiplexes other decryption strategies {NACL, KMS}
@@ -22,13 +22,13 @@ type CompositeDecryptionStrategy struct {
 }
 
 // Decrypt decrypts an envelope
-func (k *CompositeDecryptionStrategy) Decrypt(envelope string) ([]byte, error) {
+func (k *CompositeDecryptionStrategy) Decrypt(envelope, optionalName string) ([]byte, error) {
 	// Get the type of encryption {NACL, KMS}
 	envelopeType := extractEnvelopeType(envelope)
 	strategy := k.Strategies[envelopeType]
 
 	if strategy != nil {
-		return strategy.Decrypt(envelope)
+		return strategy.Decrypt(envelope, optionalName)
 	}
 
 	return nil, fmt.Errorf("Not configured for decrypting ENC[%s,..] values", envelopeType)
@@ -63,7 +63,7 @@ type KeyDecryptionStrategy struct {
 }
 
 // Decrypt decrypts an envelope
-func (k *KeyDecryptionStrategy) Decrypt(envelope string) ([]byte, error) {
+func (k *KeyDecryptionStrategy) Decrypt(envelope, optionalName string) ([]byte, error) {
 	return decryptEnvelope(k.PublicKey, k.PrivateKey, envelope)
 }
 
@@ -86,10 +86,10 @@ func newDaemonDecryptionStrategy(
 }
 
 // Decrypt decrypts an envelope
-func (r *DaemonDecryptionStrategy) Decrypt(envelope string) ([]byte, error) {
+func (r *DaemonDecryptionStrategy) Decrypt(envelope, optionalName string) ([]byte, error) {
 	message := DaemonRequest{
 		AppID: r.AppID, AppVersion: r.AppVersion, TaskID: r.TaskID,
-		RequestedSecret: envelope,
+		RequestedSecret: envelope, Key: optionalName,
 	}
 	encoded, err := json.Marshal(message)
 	if err != nil {

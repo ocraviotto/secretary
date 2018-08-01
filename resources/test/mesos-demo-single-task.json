@@ -1,0 +1,99 @@
+{
+  "agent_id": {
+    "value": "d1461150-5b17-4a4c-9b95-3738bafad6d7-S0"
+  },
+  "discovery": {
+    "name": "20180725075828m0Ezl.test-job",
+    "ports": {},
+    "visibility": "FRAMEWORK"
+  },
+  "framework_id": {
+    "value": "19740bcf-3783-4609-a887-7ebb917a7a44-0000"
+  },
+  "labels": {
+    "labels": [
+      {
+        "key": "TEST_LABEL",
+        "value": "1"
+      },
+      {
+        "key": "TEST_LABEL_2",
+        "value": "2"
+      },
+      {
+        "key": "DEPLOY_PUBLIC_KEY",
+        "value": "omO6DSEw/mZDG9NuhyEC4uYbgwwqEivOuX0EqX9+Ql0="
+      },
+      {
+        "key": "SERVICE_PUBLIC_KEY",
+        "value": "kVOhhw2wAJuAofxO7h4EM0xboxGAwnsq9J6fluFY5CQ="
+      },
+      {
+        "key": "ALLOWED_SECRETS_VARS",
+        "value": "ENV_1,ENV_2"
+      }
+    ]
+  },
+  "name": "20180725075828m0Ezl.test-job",
+  "resources": [
+    {
+      "allocation_info": {
+        "role": "*"
+      },
+      "name": "cpus",
+      "scalar": {
+        "value": 0.01
+      },
+      "type": "SCALAR"
+    },
+    {
+      "allocation_info": {
+        "role": "*"
+      },
+      "name": "mem",
+      "scalar": {
+        "value": 128
+      },
+      "type": "SCALAR"
+    }
+  ],
+  "state": "TASK_RUNNING",
+  "status_update_state": "TASK_RUNNING",
+  "status_update_uuid": "ENbGANY9SIWp6TkXt+7Arw==",
+  "statuses": [
+    {
+      "agent_id": {
+        "value": "d1461150-5b17-4a4c-9b95-3738bafad6d7-S0"
+      },
+      "container_status": {
+        "container_id": {
+          "value": "9edd518d-0a37-468c-97f1-9dcc61b5e3fd"
+        },
+        "executor_pid": 121535,
+        "network_infos": [
+          {
+            "ip_addresses": [
+              {
+                "ip_address": "10.0.0.6",
+                "protocol": "IPv4"
+              }
+            ]
+          }
+        ]
+      },
+      "executor_id": {
+        "value": "test-job_20180725075828m0Ezl.83c2ad68-8fe0-11e8-88f5-b2fbd5835ad5"
+      },
+      "source": "SOURCE_EXECUTOR",
+      "state": "TASK_RUNNING",
+      "task_id": {
+        "value": "test-job_20180725075828m0Ezl.83c2ad68-8fe0-11e8-88f5-b2fbd5835ad5"
+      },
+      "timestamp": 1532505508.28216,
+      "uuid": "ENbGANY9SIWp6TkXt+7Arw=="
+    }
+  ],
+  "task_id": {
+    "value": "test-job_20180725075828m0Ezl.83c2ad68-8fe0-11e8-88f5-b2fbd5835ad5"
+  }
+}

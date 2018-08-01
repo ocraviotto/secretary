@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -108,6 +110,16 @@ func httpPostForm(url string, values url.Values) ([]byte, error) {
 	return httpReadBody(response)
 }
 
+func httpPostJSON(url string, json []byte) ([]byte, error) {
+
+	response, err := http.Post(url, "application/json", bytes.NewBuffer(json))
+	if err != nil {
+		return nil, err
+	}
+
+	return httpReadBody(response)
+}
+
 func httpGet(url string) ([]byte, error) {
 	response, err := http.Get(url)
 	if err != nil {
@@ -115,4 +127,12 @@ func httpGet(url string) ([]byte, error) {
 	}
 
 	return httpReadBody(response)
+}
+
+func strToTimeRFC3339(timestr string) (time.Time, error) {
+	rfc3339, err := time.Parse(time.RFC3339, timestr)
+	if err != nil {
+		return rfc3339, fmt.Errorf("Failed to parse time string (%s) due to error (%s)", timestr, err)
+	}
+	return rfc3339, nil
 }

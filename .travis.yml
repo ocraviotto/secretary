@@ -1,21 +1,31 @@
 language: go
-sudo: false
+sudo: required
 os:
-  - linux
-  - osx
+- linux
+- osx
 go:
-  - 1.6.3
-
-# Deploy executables to Github release tags
+- 1.9.2
+services:
+- docker
+script:
+- make
+- if [ "$TRAVIS_TAG" != "" ] && [ "$TRAVIS_OS_NAME" == "linux" ]; then make docker;
+  fi
 deploy:
-  provider: releases
+- provider: releases
   api_key:
-    secure: JotH2XgNOyR2Pi+5NMQRS2t7VhMamxzhlxWf+pXC3hUUzeIKSTszX0DVtfgjKkLkJzoai9Y62kEUhEvOHEqdQN8hsE89mjbBVCTPpO0Jl0NNJ8HKbIlg0iY5vgMesQTO5LrSIQoYfILhGFVUqVvRPw/7CX7Y5wSV6ca4SvvruSSzyG2dEyehCR5TcPFJR/aH4DmO/I4AumPEA82uuv3naaGmFl1y45Q51jgUWWq2WvJK/i0pECWzSc6HtVUAvFvrypZKRu4L+EFC0DS8mSUa6lgEsUnp714/YnYM2zXqXy2vBZR/ZNZVN3/67BGpqaZeGmoKEH0l5cXzBdPTiuihneziI6v3E+CP6E/bhVTSiDKJw1yeA8E5fdotnjhvXVHAxftA182yh3TVPnDinn/QKgTsdtS4ofs99AOyqtaMGdIGp5WRDJsP/40bsy9uRApdrxiKqpSxWcSQndqs3x506fVcd2VnuITSIA9q4lM6d1x1pP74qtcGx175iI1TLt06wu59mnXC8Ba+uZh6ycY37Zsiqdvr1J+hJCUJrTMXDghFtrHSUhxOvVWtehQbG2VL53/NhvwCauwZLVJiiNmqZcppyWDww6Y7+zSNBPm9MIY0o/bgr3nCHSDRiQ3mhmauO12hab6svmPIhcDQ/n1lMpF4OgXbdWwlPCoGh/sZAYg=
-  file: "secretary-$(uname -s)-$(uname -m)"
+    secure: L2eddprJPdwL8NMsRZdHOjlRIkXX3sJtX4oDx14ZLN7XVKFzjXVxeaUWf28mK0SaY9tbjE7cJUUGE38vtkiYail5fp8Ji0Ta4o6rOzbO7TNsHiyl+IOPDzsTwcpdEDWHaR6zMNPsulEiK8PF9I9GYggyUaZ2UQdJK+XsAtUrmDKBOJYgad32O9u0Vzjd/8GQVpXGFLCQxsKFoSqYhbReh9/uJg2DST0nTtGqW8doUyklr/lCWDsxRNJJncEjT0IO0YKWrOOX5H2ZCljH9ojsbIZantLgawjYuypk0TuXpE/2S3Ei26+jf0XIWlZSPqkjbq0irztH9X+OZgICOvPI+iOr6LM9yXPTCvCfVxUv2tAed/rJU2TJB3sjrENSVGmA7IByCn5BZznShpIt2hMYq83y75N2NGxvCgYae69rqR/B25tj30uTtLbObaCoObESiQ5Va/z+1BpgWVVJaFenrxHv0Jq1yw8oiHrYOhIJQ4Y7POkO85/gNC2VcHzC2gl80NFY2UyGWEfE1AL5++FguGCQy+9s2dzkIlXops1+ViamQSR8y+TxM7KRRGFM5niay4SzVhlcQ/5zoZjl1Ft3T2sVA/Ol+kTKXTymdCGVne8h6nnO5gL9AyxynOXDeoflxOsGV64ytkF3/9k6ffpAgtiUTyfBlqmj0lh+ixCh4xY=
+  file: secretary-$(uname -s)-$(uname -m)
   skip_cleanup: true
   on:
     tags: true
-
-# Code coverage for master branch using https://codecov.io/github/mikljohansson/secretary
+    repo: ocraviotto/secretary
 after_success:
-  - if [ "$TRAVIS_TAG" == "" ] && [ "$TRAVIS_OS_NAME" == "linux" ]; then bash <(curl -s https://codecov.io/bash); fi
+- if [ "$TRAVIS_TAG" == "" ] && [ "$TRAVIS_OS_NAME" == "linux" ]; then bash <(curl
+  -s https://codecov.io/bash); fi
+- if [ "$TRAVIS_TAG" != "" ] && [ "$TRAVIS_OS_NAME" == "linux" ]; then docker login
+  -u $DOCKER_USERNAME -p $DOCKER_PASSWORD ; make docker-push ; fi
+env:
+  global:
+  - secure: P0pp9CJXAsik45wRoOXuRBdIbyseXllkJrEZjTV3zuT8ebL7RShc37jsHK3MTeicv9JDVFTkCNrjrquV0rlmTE1tfMYSNMniWUZ/Wovyw9IoTN+dFbK3F3qxjpC8PxEm9xNRLCVvsWZ95KHHAkGZYDvLLTxBvvYWpGT/+wFcabI7cF2yXqpmh+3aUtfET4fcTRaOPHWo1n40gCDFqQTOj/91wuPsJB4QGYb5wuWwHFO5ATGseycz01yKdI7NVL280+Ab3SNX6aqEarqGYN97HKeGNZ3f81UejOoHYXpNo3/cevTbDINtfeu0GF0RLS7QBxAZjcgHBHf904kZtC4iYtE+Kw2H83fZ++kl/MgVdvc/BOIsDY25w4bkc0XZh+uSlcdLmpWlTCf1EchmnNm2HlZ1g/jVkTlwr8qcCah4L2VJWyAOopkzLhZw/QAnUny2IeYPPx2IVLkbOBiV3TC4MjuK1JKgijECqch8sOVaOu7hhPKBrkcpX46/cGRvMgDeANsjXJ5wem2a559pNc5cOYUFtepdBDH6Eux+zPLlE4p63MdlLvSEUSWL8n2iVYz1oTSrg48g8Vmnid0aRXbm023RPptbEGIDZCnLcahhOo2UZPDWh9qRu6iYDPEbXuO5CDBwJXGTyxJ4UMD4g8EPAfo6QN4W1dw1RACrS/eoBn4=
+  - secure: n1QRfncqyxUrhA8izqiVf2JfWvE09yhEs0JLtwuSKgYHRmnPzGwwaqUzOkpB/pt5i12yvOHZChVqbJyiSIunbFdweY3Wh1sPvkqARRZoNf30Pu+sqJsAuA6MzPRw+x2uo4YVzMj8EiwZVfUrXqxhdj7lithxcnC4SOtwRfi5cYQ/duzQgWtzPMXg/tomtNe20AW1QsA5UHVoeiUumz0yp0qVVCFD8UEFF4UD4YOk7GEI4orLHCS5Ie724qyus8SuROVtBEnzZ/kxqPEiwgJyeHVemHACRtGxAPlb6ZkRYjTGzcEMhyKAze673hri/PgYbLT0gddGtkzu+C4dm9aPBEagdDozncjaCmqQYogJPuk9OFORnMPuk1J3bqmx9VApZ3WQKIbUs8SXfPQ2lr2/LDhhpSVrMA/8OPP5KTxnigM3GYDCJvClMWy1UZsNZ4CGRQLWZZfZ14lmbr7l3eD3V38DLMeVqokSAJ4Qh0yOtBx7Cf5DiEKeRxtYvUrvoAiHK3ZXixK3zEpq4mIXr0RoKKcIYkkLZ5q2XF+bP76h6iWjO1ymUrHxS6rcz6kdC0t8IRzG5Tloi8ITuJytcrQvv8WDwY57SQ1DD7c3rPzUGOr8ozN1snldSX7VHYNF0ncozucesXGh2FFxJcOUFi2Ew9ZN9TeSOQ6Tfur/o/r4tLk=
