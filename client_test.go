@@ -347,8 +347,9 @@ func TestDaemonDecryptionStrategy(t *testing.T) {
 		assert.Equal(t, "Failed to decrypt using daemon (HTTP 400 Error: Failed to decrypt plaintext secret, incorrect config or master key? (Failed to decrypt (incorrect keys?)))", err.Error())
 	}
 
-	// Mesos tests
-	appID, appVersion = "", ""
+	// Mesos tests - appID and appVersion have values that resamble metronome tasks
+	// but we also test with empty appID and appVersion
+	appID, appVersion = "/test-job/20180725075828m0Ezl", "1970-01-01T00:00:00.000Z"
 	taskID = "test-job_20180725075828m0Ezl.83c2ad68-8fe0-11e8-88f5-b2fbd5835ad5"
 	encryptedSecretEnvVarName := "NACL_SECRET"
 	kmsSecretEnvVarName := "KMS_SECRET"
@@ -368,6 +369,23 @@ func TestDaemonDecryptionStrategy(t *testing.T) {
 	{
 		crypto := newDaemonDecryptionStrategy(daemon.URL,
 			appID, appVersion, taskID,
+			pemRead("./resources/test/keys/master-public-key.pem"),
+			deployPrivateKey,
+			pemRead("./resources/test/keys/myservice-private-key.pem"))
+
+		plaintext, err := crypto.Decrypt(encryptedSecret, encryptedSecretEnvVarName)
+		assert.Nil(t, err)
+		assert.Equal(t, "secret", string(plaintext))
+
+		plaintext, err = crypto.Decrypt(kmsSecret, kmsSecretEnvVarName)
+		assert.Nil(t, err)
+		assert.Equal(t, "secret", string(plaintext))
+	}
+
+	// Test Mesos decryption with empty appID and appVersion
+	{
+		crypto := newDaemonDecryptionStrategy(daemon.URL,
+			"", "", taskID,
 			pemRead("./resources/test/keys/master-public-key.pem"),
 			deployPrivateKey,
 			pemRead("./resources/test/keys/myservice-private-key.pem"))
@@ -432,6 +450,20 @@ func TestDaemonDecryptionStrategy(t *testing.T) {
 		plaintext, err := crypto.Decrypt(encryptedSecret, encryptedSecretEnvVarName)
 		assert.NotNil(t, err)
 		assert.Nil(t, plaintext)
+	}
+
+	// Test Mesos with bad app Version
+	{
+		crypto := newDaemonDecryptionStrategy(daemon.URL,
+			appID, "whatever", taskNonExistingID,
+			pemRead("./resources/test/keys/master-public-key.pem"),
+			deployPrivateKey,
+			pemRead("./resources/test/keys/myservice-private-key.pem"))
+
+		plaintext, err := crypto.Decrypt(encryptedSecret, encryptedSecretEnvVarName)
+		assert.NotNil(t, err)
+		assert.Nil(t, plaintext)
+		assert.Equal(t, "Failed to decrypt using daemon (HTTP 422 Error: Expected appVersion in valid RFC 3339. Wrong format given)", err.Error())
 	}
 
 }

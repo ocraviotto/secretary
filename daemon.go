@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+const unixTimeRFC3339Str string = "1970-01-01T00:00:00.000Z"
+
 // DaemonRequest is the request expected by the /v1/decrypt endpoint
 // RequestedSecret is the Secret encrypted with master key
 // Key is an optional Name (Enva Var key) of RequestedSecret
@@ -158,7 +160,25 @@ func decryptEndpointHandler(marathonURL, mesosLeaderURL string, masterKey *[32]b
 
 		var at *AppOrTask
 
-		if appID != "" && taskID != "" && appVersion != "" && serviceEnvelope != "" {
+		// Jobs use marathon under the hood, so the client will collect the same MARATHON_ variables
+		// We will need to distinguish by checking whether appVersion has a time string content
+		// and if it does, whether it is unix time
+		itIsAppVersion := false
+		if appVersion != "" {
+			unixTimeRFC3339, _ := strToTimeRFC3339(unixTimeRFC3339Str)
+			appVersionTimeRFC3339, errav := strToTimeRFC3339(appVersion)
+			if errav != nil {
+				log.Printf("App Version for taskID %s came in the wrong format, unable to parse it as time RFC3339. It was: %s", taskID, errav)
+				errorResponse(w, r, "Expected appVersion in valid RFC 3339. Wrong format given", http.StatusUnprocessableEntity)
+				return
+			} else if !unixTimeRFC3339.Equal(appVersionTimeRFC3339) {
+				itIsAppVersion = true
+			} else {
+				log.Printf("App Version for taskID %s is a unix timestamp", taskID)
+			}
+		}
+
+		if appID != "" && taskID != "" && itIsAppVersion && serviceEnvelope != "" {
 			log.Printf("Using marathon at %s for appID %s", marathonURL, appID)
 			at, err = getMarathonApp(marathonURL, appID, appVersion, taskID)
 			if err != nil {
@@ -166,7 +186,7 @@ func decryptEndpointHandler(marathonURL, mesosLeaderURL string, masterKey *[32]b
 				return
 			}
 
-		} else if taskID != "" && serviceEnvelope != "" {
+		} else if taskID != "" && serviceEnvelope != "" && !itIsAppVersion {
 			log.Printf("Using mesos at %s for task with ID %s", mesosLeaderURL, taskID)
 			at, err = getMesosTasks(mesosLeaderURL, taskID)
 			if err != nil {
@@ -175,7 +195,7 @@ func decryptEndpointHandler(marathonURL, mesosLeaderURL string, masterKey *[32]b
 			}
 
 		} else {
-			errorResponse(w, r, errors.New("Expected parameters {appid, appversion, taskid, envelope} missing"), http.StatusBadRequest)
+			errorResponse(w, r, errors.New("Expected parameters, one of {appid, appversion, taskid, envelope} missing"), http.StatusBadRequest)
 			return
 		}
 
